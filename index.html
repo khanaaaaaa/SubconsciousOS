@@ -11,19 +11,21 @@
     </video>
 
     <div id="desktop">
-        <div class="icon" data-app="clock" style="top: 2%; left: 2%;">
+        <div class="icon" data-app="clock">
             <div class="icon-img">🕐</div>
             <div class="icon-label">Clock</div>
         </div>
-        <div class="icon" data-app="notes" style="top: 15%; left: 2%;">
+        <div class="icon" data-app="notes">
             <div class="icon-img">📝</div>
             <div class="icon-label">Notes</div>
         </div>
-        <div class="icon" data-app="files" style="top: 28%; left: 2%;">
+        <div class="icon" data-app="files">
             <div class="icon-img">📁</div>
             <div class="icon-label">Files</div>
         </div>
     </div>
+
+    <div id="windows"></div>
 
     <div id="taskbar">
         <div id="start-btn">⊞</div>
@@ -69,7 +71,7 @@
             text-align: center;
             width: 80px;
             padding: 8px;
-            transition: all 0.2s ease;
+            transition: none;
         }
 
         .icon:hover {
@@ -164,28 +166,6 @@
     </style>
 
     <script>
-        const icons = document.querySelectorAll('.icon');
-
-        document.addEventListener('mousemove', (e) => {
-            icons.forEach(icon => {
-                const rect = icon.getBoundingClientRect();
-                const iconX = rect.left + rect.width / 2;
-                const iconY = rect.top + rect.height / 2;
-                const dx = e.clientX - iconX;
-                const dy = e.clientY - iconY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < 150) {
-                    const force = (150 - distance) / 150;
-                    const moveX = -dx * force * 0.5;
-                    const moveY = -dy * force * 0.5;
-                    icon.style.transform = `translate(${moveX}px, ${moveY}px)`;
-                } else {
-                    icon.style.transform = 'translate(0, 0)';
-                }
-            });
-        });
-
         function updateClock() {
             const now = new Date();
             const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -198,11 +178,6 @@
     <script src="effects/particles.js"></script>
     <script src="effects/drift.js"></script>
     <script src="effects/glitches.js"></script>
-    <script src="components/windows.js"></script>
-    <script src="components/notifications.js"></script>
-    <script src="apps/clock.js"></script>
-    <script src="apps/notes.js"></script>
-    <script src="apps/files.js"></script>
     <script src="main.js"></script>
 </body>
 </html>
