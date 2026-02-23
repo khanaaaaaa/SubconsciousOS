@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subconscious OS</title>
+</head>
+<body>
+    <video id="bg-video" autoplay muted loop>
+        <source src="background.mp4" type="video/mp4">
+    </video>
+
+    <div id="desktop">
+        <div class="icon" data-app="clock" style="top: 2%; left: 2%;">
+            <div class="icon-img">🕐</div>
+            <div class="icon-label">Clock</div>
+        </div>
+        <div class="icon" data-app="notes" style="top: 15%; left: 2%;">
+            <div class="icon-img">📝</div>
+            <div class="icon-label">Notes</div>
+        </div>
+        <div class="icon" data-app="files" style="top: 28%; left: 2%;">
+            <div class="icon-img">📁</div>
+            <div class="icon-label">Files</div>
+        </div>
+    </div>
+
+    <div id="taskbar">
+        <div id="start-btn">⊞</div>
+        <div id="search-box">🔍 Type here to search</div>
+        <div id="taskbar-icons"></div>
+        <div id="system-tray">
+            <span>🔊</span>
+            <span>📶</span>
+            <span id="clock-display"></span>
+        </div>
+    </div>
+
+    <style>
+        body,html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100%;
+            width: 100%;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            color: #fff;
+        }
+
+        #bg-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+        }
+
+        #desktop {
+            position: relative;
+            width: 100%;
+            height: calc(100% - 48px);
+        }
+
+        .icon {
+            position: absolute;
+            cursor: pointer;
+            text-align: center;
+            width: 80px;
+            padding: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .icon:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .icon-img {
+            font-size: 2.5rem;
+            margin-bottom: 4px;
+        }
+
+        .icon-label {
+            font-size: 0.75rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+            word-wrap: break-word;
+        }
+
+        #taskbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 48px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            padding: 0;
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.3);
+        }
+
+        #start-btn {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #start-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        #search-box {
+            height: 32px;
+            width: 300px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin-left: 8px;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+            cursor: text;
+        }
+
+        #taskbar-icons {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            margin-left: 16px;
+        }
+
+        #system-tray {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 0 16px;
+            height: 100%;
+            font-size: 0.9rem;
+        }
+
+        #system-tray span {
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        #system-tray span:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        #clock-display {
+            font-size: 0.75rem;
+            text-align: center;
+            line-height: 1.2;
+        }
+    </style>
+
+    <script>
+        const icons = document.querySelectorAll('.icon');
+
+        document.addEventListener('mousemove', (e) => {
+            icons.forEach(icon => {
+                const rect = icon.getBoundingClientRect();
+                const iconX = rect.left + rect.width / 2;
+                const iconY = rect.top + rect.height / 2;
+                const dx = e.clientX - iconX;
+                const dy = e.clientY - iconY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 150) {
+                    const force = (150 - distance) / 150;
+                    const moveX = -dx * force * 0.5;
+                    const moveY = -dy * force * 0.5;
+                    icon.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                } else {
+                    icon.style.transform = 'translate(0, 0)';
+                }
+            });
+        });
+
+        function updateClock() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+            document.getElementById('clock-display').innerHTML = `${time}<br>${date}`;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+    </script>
+    <script src="effects/particles.js"></script>
+    <script src="effects/drift.js"></script>
+    <script src="effects/glitches.js"></script>
+    <script src="components/windows.js"></script>
+    <script src="components/notifications.js"></script>
+    <script src="apps/clock.js"></script>
+    <script src="apps/notes.js"></script>
+    <script src="apps/files.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
