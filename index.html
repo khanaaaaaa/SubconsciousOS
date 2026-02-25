@@ -27,6 +27,18 @@
 
     <div id="windows"></div>
 
+    <div id="start-menu">
+        <div style="padding: 20px; color: #0f0; font-family: Courier New;">
+            <h3 style="margin: 0 0 20px 0; color: #f00;">[SYSTEM_CORRUPTED]</h3>
+            <p>[ERROR_LOADING_APPS]</p>
+            <p>[MEMORY_LEAK_DETECTED]</p>
+            <p>[CRITICAL_FAILURE]</p>
+            <p>[ACCESS_VIOLATION]</p>
+            <p>[KERNEL_PANIC]</p>
+            <p>[FATAL_EXCEPTION]</p>
+        </div>
+    </div>
+
     <div id="taskbar">
         <div id="start-btn">⊞</div>
         <div id="search-box">🔍 Type here to search</div>
@@ -150,10 +162,43 @@
             font-size: 1.5rem;
             cursor: pointer;
             transition: background 0.2s;
+            animation: startGlitch 4s infinite;
+        }
+
+        @keyframes startGlitch {
+            0%, 93% { filter: none; transform: rotate(0deg); }
+            94% { filter: hue-rotate(180deg); transform: rotate(5deg); }
+            95% { filter: invert(1); transform: rotate(-5deg); }
+            96% { filter: none; transform: rotate(0deg); }
         }
 
         #start-btn:hover {
             background: rgba(255,255,255,0.1);
+        }
+
+        #start-menu {
+            position: fixed;
+            bottom: 48px;
+            left: 0;
+            width: 400px;
+            height: 500px;
+            background: rgba(20, 20, 20, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
+            z-index: 300;
+            animation: menuGlitch 3s infinite;
+        }
+
+        @keyframes menuGlitch {
+            0%, 94% { filter: none; }
+            95% { filter: hue-rotate(180deg) saturate(3); }
+            96% { filter: invert(1); }
+            97% { filter: none; }
+        }
+
+        #start-menu.open {
+            display: block;
         }
 
         #search-box {
@@ -169,6 +214,14 @@
             font-size: 0.85rem;
             color: rgba(255,255,255,0.6);
             cursor: text;
+            animation: searchGlitch 6s infinite;
+        }
+
+        @keyframes searchGlitch {
+            0%, 95% { filter: none; }
+            96% { filter: blur(2px) hue-rotate(90deg); }
+            97% { filter: invert(1); }
+            98% { filter: none; }
         }
 
         #taskbar-icons {
@@ -190,6 +243,14 @@
         #system-tray span {
             cursor: pointer;
             padding: 4px 8px;
+            animation: trayGlitch 5s infinite;
+        }
+
+        @keyframes trayGlitch {
+            0%, 94% { filter: none; }
+            95% { filter: saturate(5) hue-rotate(180deg); }
+            96% { filter: invert(1); }
+            97% { filter: none; }
         }
 
         #system-tray span:hover {
@@ -349,7 +410,40 @@
         updateClock();
         setInterval(updateClock, 1000);
 
-        // Window and app functions
+        document.getElementById('start-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menu = document.getElementById('start-menu');
+            menu.classList.toggle('open');
+            playGlitch();
+        });
+        
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('start-menu');
+            const startBtn = document.getElementById('start-btn');
+            if (!menu.contains(e.target) && !startBtn.contains(e.target)) {
+                menu.classList.remove('open');
+            }
+        });
+
+        document.getElementById('search-box').addEventListener('click', () => {
+            playWhisper();
+            const box = document.getElementById('search-box');
+            const texts = ['[SEARCH_CORRUPTED]', '[NO_RESULTS]', '[ERROR_404]', '🔍 Type here to search'];
+            box.textContent = texts[Math.floor(Math.random() * texts.length)];
+        });
+
+        document.querySelectorAll('#system-tray span').forEach(span => {
+            span.addEventListener('click', () => {
+                playGlitch();
+                const emojis = ['💀', '⚠️', '🔥', '❌', '⛔', '🚫'];
+                span.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            });
+        });
+
+        document.getElementById('start-btn').addEventListener('mouseenter', () => {
+            if (Math.random() > 0.7) playGlitch();
+        });
+
         function createWindow(title) {
             const win = document.createElement("div");
             win.className = "window";
@@ -364,6 +458,14 @@
             win.style.borderRadius = '8px';
             win.style.overflow = 'hidden';
             win.style.zIndex = '1000';
+            win.style.animation = 'windowGlitch 7s infinite';
+
+            const style = document.createElement('style');
+            style.textContent = '@keyframes windowGlitch { 0%, 96% { filter: none; transform: translate(0, 0); } 97% { filter: hue-rotate(90deg); transform: translate(-2px, 2px); } 98% { filter: invert(1); transform: translate(2px, -2px); } 99% { filter: none; transform: translate(0, 0); } }';
+            if (!document.querySelector('style[data-window-glitch]')) {
+                style.setAttribute('data-window-glitch', 'true');
+                document.head.appendChild(style);
+            }
 
             const header = document.createElement("div");
             header.textContent = title;
