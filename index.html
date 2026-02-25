@@ -143,7 +143,7 @@
             padding: 0;
             box-shadow: 0 -1px 3px rgba(0,0,0,0.3);
             z-index: 200;
-            animation: taskbarShake 8s infinite;
+            animation: taskbarShake 8s infinite, taskbarGlitch 6s infinite;
         }
 
         @keyframes taskbarShake {
@@ -151,6 +151,13 @@
             98% { transform: translateY(-3px); }
             99% { transform: translateY(3px); }
             100% { transform: translateY(0); }
+        }
+
+        @keyframes taskbarGlitch {
+            0%, 94% { filter: none; }
+            95% { filter: hue-rotate(90deg) saturate(2); }
+            96% { filter: invert(0.3); }
+            97% { filter: none; }
         }
 
         #start-btn {
@@ -262,9 +269,72 @@
             text-align: center;
             line-height: 1.2;
         }
+
+        .ghost-window {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .afterimage {
+            position: absolute;
+            opacity: 0.2;
+            pointer-events: none;
+            transition: opacity 2s;
+        }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(var(--drift-x), var(--drift-y)); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid #0078d4;
+            padding: 15px;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 0.85rem;
+            z-index: 9999;
+            animation: notifSlide 0.3s ease;
+            max-width: 300px;
+        }
+
+        @keyframes notifSlide {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
     </style>
 
     <script>
+        // Memory System
+        const memory = {
+            interactions: JSON.parse(localStorage.getItem('subconsciousOS_memory') || '[]'),
+            iconPositions: JSON.parse(localStorage.getItem('iconPositions') || '{}'),
+            appOpenCount: JSON.parse(localStorage.getItem('appOpenCount') || '{}'),
+            lastSession: localStorage.getItem('lastSession') || Date.now(),
+            noteHistory: JSON.parse(localStorage.getItem('noteHistory') || '[]'),
+            
+            save() {
+                localStorage.setItem('subconsciousOS_memory', JSON.stringify(this.interactions.slice(-50)));
+                localStorage.setItem('iconPositions', JSON.stringify(this.iconPositions));
+                localStorage.setItem('appOpenCount', JSON.stringify(this.appOpenCount));
+                localStorage.setItem('lastSession', Date.now());
+                localStorage.setItem('noteHistory', JSON.stringify(this.noteHistory.slice(-20)));
+            },
+            
+            addInteraction(type, data) {
+                this.interactions.push({ type, data, time: Date.now() });
+                this.save();
+            },
+            
+            getRecentInteractions(type, limit = 5) {
+                return this.interactions.filter(i => i.type === type).slice(-limit);
+            }
+        };
+
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playGlitch() {
@@ -304,19 +374,48 @@
             osc.stop(audioCtx.currentTime + 0.2);
         }
 
+        function showNotification(message) {
+            const notif = document.createElement('div');
+            notif.className = 'notification';
+            notif.textContent = message;
+            document.body.appendChild(notif);
+            setTimeout(() => notif.remove(), 4000);
+        }
+
+        function createAfterimage(element) {
+            const clone = element.cloneNode(true);
+            clone.className += ' afterimage';
+            clone.style.left = element.style.left;
+            clone.style.top = element.style.top;
+            document.getElementById('desktop').appendChild(clone);
+            setTimeout(() => {
+                clone.style.opacity = '0';
+                setTimeout(() => clone.remove(), 2000);
+            }, 100);
+        }
+
         const icons = document.querySelectorAll('.icon');
         const iconData = [];
 
         icons.forEach((icon, index) => {
+            const appName = icon.dataset.app;
+            const savedPos = memory.iconPositions[appName];
+            
             const data = {
                 element: icon,
-                x: Math.random() * (window.innerWidth - 100),
-                y: Math.random() * (window.innerHeight - 200),
+                x: savedPos ? savedPos.x : Math.random() * (window.innerWidth - 100),
+                y: savedPos ? savedPos.y : Math.random() * (window.innerHeight - 200),
                 vx: 0,
                 vy: 0,
-                settled: false
+                settled: false,
+                driftX: (Math.random() - 0.5) * 20,
+                driftY: (Math.random() - 0.5) * 20
             };
             iconData.push(data);
+
+            icon.style.setProperty('--drift-x', data.driftX + 'px');
+            icon.style.setProperty('--drift-y', data.driftY + 'px');
+            icon.style.animation += ', drift 15s ease-in-out infinite';
 
             icon.addEventListener('mouseenter', () => {
                 playBell();
@@ -324,12 +423,20 @@
                     data.vx += (Math.random() - 0.5) * 5;
                     data.vy -= Math.random() * 3;
                 }
+                if (Math.random() > 0.8) createAfterimage(icon);
             });
             
             icon.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 playWhisper();
                 const app = icon.dataset.app;
+                memory.appOpenCount[app] = (memory.appOpenCount[app] || 0) + 1;
+                memory.addInteraction('app_open', { app, count: memory.appOpenCount[app] });
+                
+                if (memory.appOpenCount[app] > 3) {
+                    showNotification(`You've opened ${app} ${memory.appOpenCount[app]} times...`);
+                }
+                
                 if (typeof openClock !== 'undefined' && app === "clock") openClock();
                 if (typeof openNotes !== 'undefined' && app === "notes") openNotes();
                 if (typeof openFiles !== 'undefined' && app === 'files') openFiles();
@@ -363,6 +470,12 @@
                 if (icon.settled) {
                     icon.element.style.left = icon.x + 'px';
                     icon.element.style.top = icon.y + 'px';
+                    
+                    if (Math.random() > 0.998) {
+                        icon.settled = false;
+                        icon.vy = -2;
+                        icon.vx = (Math.random() - 0.5) * 3;
+                    }
                     return;
                 }
 
@@ -377,6 +490,9 @@
                 if (icon.y >= maxY) {
                     icon.y = maxY;
                     icon.settled = true;
+                    const appName = icon.element.dataset.app;
+                    memory.iconPositions[appName] = { x: icon.x, y: icon.y };
+                    memory.save();
                 }
 
                 if (icon.y < 0) {
@@ -405,10 +521,56 @@
             const now = new Date();
             const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
             const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-            document.getElementById('clock-display').innerHTML = `${time}<br>${date}`;
+            const clockEl = document.getElementById('clock-display');
+            
+            if (Math.random() > 0.95) {
+                const glitchTexts = [
+                    `[ERROR]<br>[TIME_LOST]`,
+                    `??:??<br>??/??/????`,
+                    `${String(Math.floor(Math.random() * 24)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}<br>${date}`,
+                    `${time}<br>[CORRUPTED]`,
+                    `[VOID]<br>[NULL]`,
+                    `88:88<br>88/88/8888`,
+                    `--:--<br>--/--/----`
+                ];
+                clockEl.innerHTML = glitchTexts[Math.floor(Math.random() * glitchTexts.length)];
+                clockEl.style.color = ['#f00', '#0f0', '#00f', '#ff0', '#f0f'][Math.floor(Math.random() * 5)];
+                setTimeout(() => {
+                    clockEl.innerHTML = `${time}<br>${date}`;
+                    clockEl.style.color = '#fff';
+                }, 300 + Math.random() * 500);
+            } else {
+                clockEl.innerHTML = `${time}<br>${date}`;
+            }
         }
+        
+        function glitchClock() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const date = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+            const clockEl = document.getElementById('clock-display');
+            const glitchTexts = [
+                `[ERROR]<br>[TIME_LOST]`,
+                `??:??<br>??/??/????`,
+                `${String(Math.floor(Math.random() * 24)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}<br>${date}`,
+                `${time}<br>[CORRUPTED]`,
+                `[VOID]<br>[NULL]`,
+                `88:88<br>88/88/8888`,
+                `--:--<br>--/--/----`
+            ];
+            clockEl.innerHTML = glitchTexts[Math.floor(Math.random() * glitchTexts.length)];
+            clockEl.style.color = ['#f00', '#0f0', '#00f', '#ff0', '#f0f'][Math.floor(Math.random() * 5)];
+            playGlitch();
+            setTimeout(() => {
+                clockEl.innerHTML = `${time}<br>${date}`;
+                clockEl.style.color = '#fff';
+            }, 300 + Math.random() * 500);
+        }
+        
         updateClock();
         setInterval(updateClock, 1000);
+        
+        document.getElementById('clock-display').addEventListener('click', glitchClock);
 
         document.getElementById('start-btn').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -432,7 +594,7 @@
             box.textContent = texts[Math.floor(Math.random() * texts.length)];
         });
 
-        document.querySelectorAll('#system-tray span').forEach(span => {
+        document.querySelectorAll('#system-tray span:not(#clock-display)').forEach(span => {
             span.addEventListener('click', () => {
                 playGlitch();
                 const emojis = ['💀', '⚠️', '🔥', '❌', '⛔', '🚫'];
@@ -482,7 +644,15 @@
             closeBtn.style.fontSize = '1.5rem';
             closeBtn.style.cursor = 'pointer';
             closeBtn.style.lineHeight = '1';
-            closeBtn.onclick = () => win.remove();
+            closeBtn.onclick = () => {
+                if (Math.random() > 0.7) {
+                    const ghost = win.cloneNode(true);
+                    ghost.className += ' ghost-window';
+                    document.getElementById('windows').appendChild(ghost);
+                    setTimeout(() => ghost.remove(), 3000);
+                }
+                win.remove();
+            };
             header.appendChild(closeBtn);
 
             win.appendChild(header);
@@ -490,6 +660,7 @@
 
             let isDragging = false;
             let offsetX, offsetY;
+            let driftInterval;
 
             header.onmousedown = (e) => {
                 isDragging = true;
@@ -508,6 +679,21 @@
                 isDragging = false;
             };
 
+            driftInterval = setInterval(() => {
+                if (!isDragging && Math.random() > 0.95) {
+                    const currentLeft = parseInt(win.style.left) || 0;
+                    const currentTop = parseInt(win.style.top) || 0;
+                    win.style.left = (currentLeft + (Math.random() - 0.5) * 5) + 'px';
+                    win.style.top = (currentTop + (Math.random() - 0.5) * 5) + 'px';
+                }
+            }, 2000);
+
+            const originalRemove = win.remove.bind(win);
+            win.remove = function() {
+                clearInterval(driftInterval);
+                originalRemove();
+            };
+
             return win;
         }
 
@@ -524,8 +710,24 @@
             let hourAngle = 0;
             let minuteAngle = 0;
             let secondAngle = 0;
+            let frozen = false;
+            let jumpTime = 0;
 
             function draw() {
+                if (Math.random() > 0.98) {
+                    frozen = !frozen;
+                    if (!frozen && Math.random() > 0.5) {
+                        jumpTime = (Math.random() - 0.5) * 720;
+                    }
+                }
+
+                if (!frozen) {
+                    hourAngle += 15 + jumpTime;
+                    minuteAngle += 25 + jumpTime;
+                    secondAngle += 40 + jumpTime;
+                    jumpTime *= 0.9;
+                }
+
                 ctx.fillStyle = 'rgba(20, 20, 20, 1)';
                 ctx.fillRect(0, 0, 200, 200);
                 const centerX = 100;
@@ -544,7 +746,7 @@
                 ctx.beginPath();
                 ctx.moveTo(centerX, centerY);
                 ctx.lineTo(centerX + Math.cos(hourRad) * 50, centerY + Math.sin(hourRad) * 50);
-                ctx.strokeStyle = '#fff';
+                ctx.strokeStyle = frozen ? '#f00' : '#fff';
                 ctx.lineWidth = 6;
                 ctx.stroke();
 
@@ -567,13 +769,12 @@
                 ctx.fillStyle = '#0078d4';
                 ctx.fill();
 
-                hourAngle += 15;
-                minuteAngle += 25;
-                secondAngle += 40;
-
-                if (hourAngle >= 360) hourAngle -= 360;
-                if (minuteAngle >= 360) minuteAngle -= 360;
-                if (secondAngle >= 360) secondAngle -= 360;
+                while (hourAngle >= 360) hourAngle -= 360;
+                while (hourAngle < 0) hourAngle += 360;
+                while (minuteAngle >= 360) minuteAngle -= 360;
+                while (minuteAngle < 0) minuteAngle += 360;
+                while (secondAngle >= 360) secondAngle -= 360;
+                while (secondAngle < 0) secondAngle += 360;
             }
 
             setInterval(draw, 50);
@@ -596,10 +797,17 @@
             textarea.style.color = '#0f0';
             win.appendChild(textarea);
 
+            if (memory.noteHistory.length > 0 && Math.random() > 0.5) {
+                const oldNote = memory.noteHistory[Math.floor(Math.random() * memory.noteHistory.length)];
+                textarea.value = `[RECOVERED FROM MEMORY]\n${oldNote}\n\n`;
+                textarea.style.color = '#666';
+                setTimeout(() => textarea.style.color = '#0f0', 2000);
+            }
+
             const gibberish = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
-            const words = ['ERROR', 'VOID', 'NULL', 'CORRUPT', 'GLITCH', 'SYSTEM', 'FAIL', 'CRASH', 'DEAD', 'LOST'];
+            const words = ['ERROR', 'VOID', 'NULL', 'CORRUPT', 'GLITCH', 'SYSTEM', 'FAIL', 'CRASH', 'DEAD', 'LOST', 'REMEMBER', 'FORGET', 'ECHO'];
             
-            setInterval(() => {
+            const typeInterval = setInterval(() => {
                 let text = '';
                 for (let i = 0; i < 70; i++) {
                     if (Math.random() > 0.7) {
@@ -611,9 +819,29 @@
                         text += ' ';
                     }
                 }
+                
+                if (Math.random() > 0.9) {
+                    const lines = textarea.value.split('\n');
+                    if (lines.length > 5) {
+                        lines.splice(Math.floor(Math.random() * lines.length), 1);
+                        textarea.value = lines.join('\n');
+                    }
+                }
+                
                 textarea.value += text;
                 textarea.scrollTop = textarea.scrollHeight;
+                
+                if (textarea.value.length > 500) {
+                    memory.noteHistory.push(textarea.value.substring(0, 200));
+                    memory.save();
+                }
             }, 1000);
+
+            const originalRemove = win.remove.bind(win);
+            win.remove = function() {
+                clearInterval(typeInterval);
+                originalRemove();
+            };
         }
 
         function openFiles() {
@@ -625,13 +853,65 @@
             content.style.color = '#0f0';
             content.style.fontFamily = 'Courier New';
             content.style.fontSize = '14px';
-            content.innerHTML = '<p>📁 [CORRUPTED]</p><p>📁 [ACCESS_DENIED]</p><p>📁 [FILE_NOT_FOUND]</p><p>📁 [ERROR_0x8007]</p><p>📁 [SYSTEM_FAILURE]</p><p>📁 [VOID]</p>';
+            
+            let files = [
+                '📁 [CORRUPTED]',
+                '📁 [ACCESS_DENIED]',
+                '📁 [FILE_NOT_FOUND]',
+                '📁 [ERROR_0x8007]',
+                '📁 [SYSTEM_FAILURE]',
+                '📁 [VOID]'
+            ];
+            
+            function updateFiles() {
+                if (Math.random() > 0.7) {
+                    const duplicate = files[Math.floor(Math.random() * files.length)];
+                    files.push(duplicate + '_COPY');
+                }
+                
+                if (Math.random() > 0.8 && files.length > 3) {
+                    files.splice(Math.floor(Math.random() * files.length), 1);
+                }
+                
+                if (Math.random() > 0.85) {
+                    const idx = Math.floor(Math.random() * files.length);
+                    files[idx] = files[idx].replace(/\[.*?\]/, `[MOVED_${Date.now() % 1000}]`);
+                }
+                
+                content.innerHTML = files.map(f => `<p>${f}</p>`).join('');
+            }
+            
+            updateFiles();
+            const fileInterval = setInterval(updateFiles, 3000);
+            
             content.style.animation = 'fileGlitch 2s infinite';
             const style = document.createElement('style');
             style.textContent = '@keyframes fileGlitch { 0%, 90% { filter: none; } 92% { filter: hue-rotate(180deg); } 94% { filter: invert(1); } 96% { filter: none; } }';
             document.head.appendChild(style);
             win.appendChild(content);
+            
+            const originalRemove = win.remove.bind(win);
+            win.remove = function() {
+                clearInterval(fileInterval);
+                originalRemove();
+            };
         }
+
+        // Session memory notifications
+        setTimeout(() => {
+            const timeSinceLastSession = Date.now() - memory.lastSession;
+            const hours = Math.floor(timeSinceLastSession / (1000 * 60 * 60));
+            
+            if (hours > 0) {
+                showNotification(`System remembers... ${hours} hours since last session`);
+            }
+            
+            if (memory.interactions.length > 10) {
+                setTimeout(() => {
+                    showNotification(`${memory.interactions.length} interactions stored in memory`);
+                }, 5000);
+            }
+        }, 3000);
     </script>
 </body>
 </html>
