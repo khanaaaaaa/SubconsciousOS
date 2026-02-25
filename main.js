@@ -1,102 +1,3 @@
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-function playGlitch() {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.frequency.value = Math.random() * 200 + 100;
-    gain.gain.value = 0.1;
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.stop(audioCtx.currentTime + 0.1);
-}
-
-const icons = document.querySelectorAll('.icon');
-const iconData = [];
-
-icons.forEach((icon, i) => {
-    const startX = 20;
-    const startY = 20 + (i * 100);
-    icon.style.left = startX + 'px';
-    icon.style.top = startY + 'px';
-    
-    iconData.push({
-        element: icon,
-        x: startX,
-        y: startY,
-        vx: 0,
-        vy: 0,
-        onTaskbar: false
-    });
-});
-
-document.addEventListener('mousemove', (e) => {
-    iconData.forEach(icon => {
-        if (icon.onTaskbar) return;
-        
-        const iconX = icon.x + 40;
-        const iconY = icon.y + 40;
-        const dx = e.clientX - iconX;
-        const dy = e.clientY - iconY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < 120) {
-            const force = (200 - distance) / 200;
-            icon.vx = -dx * force * 2;
-            icon.vy = -dy * force * 2;
-            if (Math.abs(icon.vx) > 1 || Math.abs(icon.vy) > 1) {
-                if (Math.random() > 0.95) playGlitch();
-            }
-        }
-    });
-});
-
-function animate() {
-    iconData.forEach(icon => {
-        if (icon.onTaskbar) {
-            icon.vx += (Math.random() - 0.5) * 5;
-            icon.vy += (Math.random() - 0.5) * 5;
-            icon.vx *= 0.9;
-            icon.vy *= 0.9;
-        } else {
-            icon.vy += 0.5;
-            icon.vx *= 0.95;
-            icon.vy *= 0.95;
-        }
-
-        icon.x += icon.vx;
-        icon.y += icon.vy;
-
-        if (icon.y >= window.innerHeight - 150) {
-            icon.y = window.innerHeight - 150;
-            icon.vy = -icon.vy * 0.3;
-            icon.onTaskbar = true;
-        }
-
-        if (icon.y < 0) {
-            icon.y = 0;
-            icon.vy = -icon.vy * 0.5;
-        }
-        if (icon.y >= window.innerHeight - 150) {
-            icon.y = window.innerHeight - 150;
-            icon.vy = -icon.vy * 0.3;
-            icon.onTaskbar = true;
-        }
-
-        if (icon.x < 0) {
-            icon.x = 0;
-            icon.vx = -icon.vx * 0.5;
-        }
-
-        icon.element.style.left = icon.x + 'px';
-        icon.element.style.top = icon.y + 'px';
-    });
-
-    requestAnimationFrame(animate);
-}
-animate();
-
 function createWindow(title) {
     const win = document.createElement("div")
     win.className = "window"
@@ -158,73 +59,46 @@ function createWindow(title) {
 
 function openClock() {
     const win = createWindow("Clock")
-    win.style.width = '300px'
-    win.style.height = '300px'
-    win.style.background = '#fff'
-
-    const canvas = document.createElement('canvas')
-    canvas.width = 250
-    canvas.height = 250
+    const canvas = document.createElement("canvas")
+    canvas.width = 200
+    canvas.height = 200
     canvas.style.display = 'block'
-    canvas.style.margin = '10px auto'
+    canvas.style.margin = '20px auto'
     win.appendChild(canvas)
 
     const ctx = canvas.getContext('2d')
-    const centerX = 125
-    const centerY = 125
-    const radius = 100
-
     let secondAngle = 0
-    let speed = 20
-    let minuteAngle = 0
-    let hourAngle = 0
-    let minuteSpeed = 8
-    let hourSpeed = 4
     let direction = 1
+    let speed = 30
 
     function draw() {
-        ctx.clearRect(0, 0, 250, 250)
+        ctx.clearRect(0, 0, 200, 200)
+        const centerX = 100
+        const centerY = 100
 
         ctx.beginPath()
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
-        ctx.strokeStyle = '#0078d4'
-        ctx.lineWidth = 3
+        ctx.arc(centerX, centerY, 90, 0, Math.PI * 2)
+        ctx.strokeStyle = '#ddd'
+        ctx.lineWidth = 2
         ctx.stroke()
 
-        for (let i = 0; i < 12; i++) {
-            const angle = (i * 30 - 90) * Math.PI / 180
-            const x1 = centerX + Math.cos(angle) * (radius - 10)
-            const y1 = centerY + Math.sin(angle) * (radius - 10)
-            const x2 = centerX + Math.cos(angle) * (radius - 20)
-            const y2 = centerY + Math.sin(angle) * (radius - 20)
-            ctx.beginPath()
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x2, y2)
-            ctx.strokeStyle = '#333'
-            ctx.lineWidth = 2
-            ctx.stroke()
-        }
+        const now = new Date()
+        const hours = now.getHours() % 12
+        const minutes = now.getMinutes()
 
-        hourAngle += hourSpeed * direction
-        minuteAngle += minuteSpeed * direction
-        if (hourAngle >= 360) hourAngle -= 360
-        if (hourAngle < 0) hourAngle += 360
-        if (minuteAngle >= 360) minuteAngle -= 360
-        if (minuteAngle < 0) minuteAngle += 360
-
-        const hourRad = (hourAngle - 90) * Math.PI / 180
-        const minuteRad = (minuteAngle - 90) * Math.PI / 180
+        const hourAngle = (hours * 30 + minutes * 0.5 - 90) * Math.PI / 180
+        const minuteAngle = (minutes * 6 - 90) * Math.PI / 180
 
         ctx.beginPath()
         ctx.moveTo(centerX, centerY)
-        ctx.lineTo(centerX + Math.cos(hourRad) * 50, centerY + Math.sin(hourRad) * 50)
+        ctx.lineTo(centerX + Math.cos(hourAngle) * 50, centerY + Math.sin(hourAngle) * 50)
         ctx.strokeStyle = '#333'
         ctx.lineWidth = 6
         ctx.stroke()
 
         ctx.beginPath()
         ctx.moveTo(centerX, centerY)
-        ctx.lineTo(centerX + Math.cos(minuteRad) * 70, centerY + Math.sin(minuteRad) * 70)
+        ctx.lineTo(centerX + Math.cos(minuteAngle) * 70, centerY + Math.sin(minuteAngle) * 70)
         ctx.strokeStyle = '#666'
         ctx.lineWidth = 4
         ctx.stroke()
@@ -259,14 +133,131 @@ function openClock() {
 
 function openNotes() {
     const win = createWindow("Notes")
+    win.style.width = '500px'
+    win.style.height = '400px'
+
+    const container = document.createElement("div")
+    container.style.position = 'relative'
+    container.style.width = '100%'
+    container.style.height = '350px'
+    container.style.overflow = 'hidden'
+    
+    const ghostLayer = document.createElement("div")
+    ghostLayer.style.position = 'absolute'
+    ghostLayer.style.top = '0'
+    ghostLayer.style.left = '0'
+    ghostLayer.style.width = '100%'
+    ghostLayer.style.height = '100%'
+    ghostLayer.style.padding = '10px'
+    ghostLayer.style.fontFamily = 'Segoe UI'
+    ghostLayer.style.fontSize = '14px'
+    ghostLayer.style.color = 'rgba(0,0,0,0.15)'
+    ghostLayer.style.pointerEvents = 'none'
+    ghostLayer.style.whiteSpace = 'pre-wrap'
+
     const textarea = document.createElement("textarea")
+    textarea.style.position = 'absolute'
+    textarea.style.top = '0'
+    textarea.style.left = '0'
     textarea.style.width = '100%'
-    textarea.style.height = '200px'
+    textarea.style.height = '100%'
     textarea.style.border = 'none'
     textarea.style.padding = '10px'
     textarea.style.fontFamily = 'Segoe UI'
+    textarea.style.fontSize = '14px'
     textarea.style.resize = 'none'
-    win.appendChild(textarea)
+    textarea.style.background = 'transparent'
+    
+    container.appendChild(ghostLayer)
+    container.appendChild(textarea)
+    win.appendChild(container)
+    
+    const words = ['dream', 'memory', 'shadow', 'whisper', 'echo', 'void', 'time', 'space', 'thought', 'feeling']
+    const letters = 'abcdefghijklmnopqrstuvwxyz '
+    
+    const synonyms = {
+        'hello': ['hi', 'hey', 'greetings'],
+        'world': ['universe', 'earth', 'globe'],
+        'good': ['great', 'nice', 'fine'],
+        'bad': ['poor', 'terrible', 'awful'],
+        'happy': ['joyful', 'glad', 'cheerful'],
+        'sad': ['unhappy', 'sorrowful', 'gloomy'],
+        'big': ['large', 'huge', 'enormous'],
+        'small': ['tiny', 'little', 'mini'],
+        'fast': ['quick', 'rapid', 'swift'],
+        'slow': ['sluggish', 'gradual', 'leisurely'],
+        'dream': ['vision', 'fantasy', 'illusion'],
+        'memory': ['recollection', 'remembrance', 'recall'],
+        'shadow': ['shade', 'silhouette', 'darkness'],
+        'time': ['moment', 'instant', 'period']
+    }
+    
+    let history = []
+    let currentText = ''
+    
+    setInterval(() => {
+        if (Math.random() > 0.8) {
+            const char = letters[Math.floor(Math.random() * letters.length)]
+            textarea.value += char
+        }
+    }, 1500)
+    
+    setInterval(() => {
+        if (Math.random() > 0.8) {
+            const word = words[Math.floor(Math.random() * words.length)]
+            textarea.value += (textarea.value.length > 0 ? ' ' : '') + word
+        }
+    }, 4000)
+    
+    textarea.addEventListener('input', () => {
+        history.push(currentText)
+        if (history.length > 5) history.shift()
+        currentText = textarea.value
+    })
+    
+    setInterval(() => {
+        if (textarea.value.length > 0) {
+            let words = textarea.value.split(' ')
+            let changed = false
+            
+            words = words.map(word => {
+                if (Math.random() > 0.7 && synonyms[word.toLowerCase()]) {
+                    changed = true
+                    const syns = synonyms[word.toLowerCase()]
+                    return syns[Math.floor(Math.random() * syns.length)]
+                }
+                return word
+            })
+            
+            if (changed) {
+                const cursorPos = textarea.selectionStart
+                textarea.value = words.join(' ')
+                textarea.setSelectionRange(cursorPos, cursorPos)
+            }
+        }
+    }, 3000)
+    
+    setInterval(() => {
+        if (history.length > 0 && Math.random() > 0.7) {
+            const oldText = history[Math.floor(Math.random() * history.length)]
+            ghostLayer.textContent = oldText
+            ghostLayer.style.color = 'rgba(0,0,0,0.3)'
+            setTimeout(() => {
+                ghostLayer.style.color = 'rgba(0,0,0,0.15)'
+                ghostLayer.textContent = ''
+            }, 500)
+        }
+    }, 4000)
+    
+    setInterval(() => {
+        const text = textarea.value
+        if (text.length > 0 && Math.random() > 0.5) {
+            textarea.style.letterSpacing = (Math.random() * 3) + 'px'
+            setTimeout(() => {
+                textarea.style.letterSpacing = '0px'
+            }, 1000)
+        }
+    }, 2000)
 }
 
 function openFiles() {
@@ -277,12 +268,17 @@ function openFiles() {
     win.appendChild(content)
 }
 
-document.querySelectorAll(".icon").forEach(icon => {
-    icon.addEventListener("click", () => {
-        const app = icon.dataset.app
+const icons = document.querySelectorAll(".icon")
 
-        if (app === "clock") openClock()
-        if (app === "notes") openNotes()
-        if (app === "files") openFiles()
+icons.forEach((icon, index) => {
+    const data = {
+        element: icon,
+        x: Math.random() * (window.innerHeight - 100)
+        y: Math.random() * (window.innerHeight - 200)
+        vx: 0
+        vy: 0
+        settled: false
+    };
+    iconData.push(data);
     })
 })

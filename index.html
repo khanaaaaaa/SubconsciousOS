@@ -12,15 +12,15 @@
 
     <div id="desktop">
         <div class="icon" data-app="clock">
-            <div class="icon-img">🕐</div>
+            <img src="icons/clock.png" class="icon-img">
             <div class="icon-label">Clock</div>
         </div>
         <div class="icon" data-app="notes">
-            <div class="icon-img">📝</div>
+            <img src="icons/notes.png" class="icon-img">
             <div class="icon-label">Notes</div>
         </div>
         <div class="icon" data-app="files">
-            <div class="icon-img">📁</div>
+            <img src="icons/files.png" class="icon-img">
             <div class="icon-label">Files</div>
         </div>
     </div>
@@ -49,6 +49,13 @@
             color: #fff;
         }
 
+        @keyframes glitchBody {
+            0%, 90% { filter: none; }
+            91% { filter: hue-rotate(90deg) saturate(3); }
+            92% { filter: invert(1); }
+            93% { filter: none; }
+        }
+
         #bg-video {
             position: fixed;
             top: 0;
@@ -56,13 +63,24 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: -1;
+            z-index: 0;
+            pointer-events: none;
+            filter: contrast(1.5) saturate(0.5);
+            animation: videoGlitch 10s infinite;
+        }
+
+        @keyframes videoGlitch {
+            0%, 95% { transform: translate(0, 0); }
+            96% { transform: translate(-5px, 5px); }
+            97% { transform: translate(5px, -5px); }
+            98% { transform: translate(0, 0); }
         }
 
         #desktop {
             position: relative;
             width: 100%;
             height: calc(100% - 48px);
+            z-index: 1;
         }
 
         .icon {
@@ -72,6 +90,16 @@
             width: 80px;
             padding: 8px;
             transition: none;
+            z-index: 100;
+            animation: iconFlicker 3s infinite;
+        }
+
+        @keyframes iconFlicker {
+            0%, 94% { opacity: 1; }
+            95% { opacity: 0.3; }
+            96% { opacity: 1; }
+            97% { opacity: 0.5; }
+            98% { opacity: 1; }
         }
 
         .icon:hover {
@@ -79,7 +107,8 @@
         }
 
         .icon-img {
-            font-size: 2.5rem;
+            width: 48px;
+            height: 48px;
             margin-bottom: 4px;
         }
 
@@ -101,6 +130,15 @@
             align-items: center;
             padding: 0;
             box-shadow: 0 -1px 3px rgba(0,0,0,0.3);
+            z-index: 200;
+            animation: taskbarShake 8s infinite;
+        }
+
+        @keyframes taskbarShake {
+            0%, 97% { transform: translateY(0); }
+            98% { transform: translateY(-3px); }
+            99% { transform: translateY(3px); }
+            100% { transform: translateY(0); }
         }
 
         #start-btn {
@@ -166,6 +204,142 @@
     </style>
 
     <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playGlitch() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = Math.random() * 200 + 100;
+            gain.gain.value = 0.1;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playWhisper() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.value = Math.random() * 100 + 50;
+            gain.gain.value = 0.05;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function playBell() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = 800 + Math.random() * 400;
+            gain.gain.value = 0.05;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            osc.stop(audioCtx.currentTime + 0.2);
+        }
+
+        const icons = document.querySelectorAll('.icon');
+        const iconData = [];
+
+        icons.forEach((icon, index) => {
+            const data = {
+                element: icon,
+                x: Math.random() * (window.innerWidth - 100),
+                y: Math.random() * (window.innerHeight - 200),
+                vx: 0,
+                vy: 0,
+                settled: false
+            };
+            iconData.push(data);
+
+            icon.addEventListener('mouseenter', () => {
+                playBell();
+                if (!data.settled) {
+                    data.vx += (Math.random() - 0.5) * 5;
+                    data.vy -= Math.random() * 3;
+                }
+            });
+            
+            icon.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                playWhisper();
+                const app = icon.dataset.app;
+                if (typeof openClock !== 'undefined' && app === "clock") openClock();
+                if (typeof openNotes !== 'undefined' && app === "notes") openNotes();
+                if (typeof openFiles !== 'undefined' && app === 'files') openFiles();
+            });
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            iconData.forEach(icon => {
+                if (icon.settled) return;
+                
+                const rect = icon.element.getBoundingClientRect();
+                const iconX = rect.left + rect.width / 2;
+                const iconY = rect.top + rect.height / 2;
+                const dx = e.clientX - iconX;
+                const dy = e.clientY - iconY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 200) {
+                    const force = (200 - distance) / 200;
+                    icon.vx = -dx * force * 2;
+                    icon.vy = -dy * force * 2;
+                    if (Math.abs(icon.vx) > 1 || Math.abs(icon.vy) > 1) {
+                        if (Math.random() > 0.95) playGlitch();
+                    }
+                }
+            });
+        });
+
+        function animate() {
+            iconData.forEach(icon => {
+                if (icon.settled) {
+                    icon.element.style.left = icon.x + 'px';
+                    icon.element.style.top = icon.y + 'px';
+                    return;
+                }
+
+                icon.vy += 0.5;
+                icon.vx *= 0.95;
+                icon.vy *= 0.98;
+
+                icon.x += icon.vx;
+                icon.y += icon.vy;
+
+                const maxY = window.innerHeight - 150;
+                if (icon.y >= maxY) {
+                    icon.y = maxY;
+                    icon.settled = true;
+                }
+
+                if (icon.y < 0) {
+                    icon.y = 0;
+                    icon.vy = 1;
+                }
+
+                if (icon.x < 0) {
+                    icon.x = 0;
+                    icon.vx = -icon.vx * 0.5;
+                }
+                if (icon.x > window.innerWidth - 100) {
+                    icon.x = window.innerWidth - 100;
+                    icon.vx = -icon.vx * 0.5;
+                }
+
+                icon.element.style.left = icon.x + 'px';
+                icon.element.style.top = icon.y + 'px';
+            });
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
         function updateClock() {
             const now = new Date();
             const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -174,10 +348,188 @@
         }
         updateClock();
         setInterval(updateClock, 1000);
+
+        // Window and app functions
+        function createWindow(title) {
+            const win = document.createElement("div");
+            win.className = "window";
+            win.style.position = 'fixed';
+            win.style.top = `${Math.random() * 40 + 10}%`;
+            win.style.left = `${Math.random() * 40 + 10}%`;
+            win.style.width = '400px';
+            win.style.minHeight = '200px';
+            win.style.background = 'rgba(20, 20, 20, 0.95)';
+            win.style.border = '1px solid #0078d4';
+            win.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3)';
+            win.style.borderRadius = '8px';
+            win.style.overflow = 'hidden';
+            win.style.zIndex = '1000';
+
+            const header = document.createElement("div");
+            header.textContent = title;
+            header.style.background = '#0078d4';
+            header.style.color = '#fff';
+            header.style.padding = '12px';
+            header.style.fontWeight = '600';
+            header.style.cursor = 'move';
+            header.style.userSelect = 'none';
+
+            const closeBtn = document.createElement("span");
+            closeBtn.textContent = '×';
+            closeBtn.style.float = 'right';
+            closeBtn.style.fontSize = '1.5rem';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.lineHeight = '1';
+            closeBtn.onclick = () => win.remove();
+            header.appendChild(closeBtn);
+
+            win.appendChild(header);
+            document.getElementById("windows").appendChild(win);
+
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            header.onmousedown = (e) => {
+                isDragging = true;
+                offsetX = e.clientX - win.offsetLeft;
+                offsetY = e.clientY - win.offsetTop;
+            };
+
+            document.onmousemove = (e) => {
+                if (isDragging) {
+                    win.style.left = (e.clientX - offsetX) + 'px';
+                    win.style.top = (e.clientY - offsetY) + 'px';
+                }
+            };
+
+            document.onmouseup = () => {
+                isDragging = false;
+            };
+
+            return win;
+        }
+
+        function openClock() {
+            const win = createWindow("Clock");
+            const canvas = document.createElement("canvas");
+            canvas.width = 200;
+            canvas.height = 200;
+            canvas.style.display = 'block';
+            canvas.style.margin = '20px auto';
+            win.appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+            let hourAngle = 0;
+            let minuteAngle = 0;
+            let secondAngle = 0;
+
+            function draw() {
+                ctx.fillStyle = 'rgba(20, 20, 20, 1)';
+                ctx.fillRect(0, 0, 200, 200);
+                const centerX = 100;
+                const centerY = 100;
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 90, 0, Math.PI * 2);
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                const hourRad = (hourAngle - 90) * Math.PI / 180;
+                const minuteRad = (minuteAngle - 90) * Math.PI / 180;
+                const secRad = (secondAngle - 90) * Math.PI / 180;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + Math.cos(hourRad) * 50, centerY + Math.sin(hourRad) * 50);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 6;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + Math.cos(minuteRad) * 70, centerY + Math.sin(minuteRad) * 70);
+                ctx.strokeStyle = '#aaa';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + Math.cos(secRad) * 85, centerY + Math.sin(secRad) * 85);
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#0078d4';
+                ctx.fill();
+
+                hourAngle += 15;
+                minuteAngle += 25;
+                secondAngle += 40;
+
+                if (hourAngle >= 360) hourAngle -= 360;
+                if (minuteAngle >= 360) minuteAngle -= 360;
+                if (secondAngle >= 360) secondAngle -= 360;
+            }
+
+            setInterval(draw, 50);
+        }
+
+        function openNotes() {
+            const win = createWindow("Notes");
+            win.style.width = '500px';
+            win.style.height = '400px';
+
+            const textarea = document.createElement("textarea");
+            textarea.style.width = '100%';
+            textarea.style.height = '350px';
+            textarea.style.border = 'none';
+            textarea.style.padding = '10px';
+            textarea.style.fontFamily = 'Segoe UI';
+            textarea.style.fontSize = '14px';
+            textarea.style.resize = 'none';
+            textarea.style.background = '#000';
+            textarea.style.color = '#0f0';
+            win.appendChild(textarea);
+
+            const gibberish = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+            const words = ['ERROR', 'VOID', 'NULL', 'CORRUPT', 'GLITCH', 'SYSTEM', 'FAIL', 'CRASH', 'DEAD', 'LOST'];
+            
+            setInterval(() => {
+                let text = '';
+                for (let i = 0; i < 70; i++) {
+                    if (Math.random() > 0.7) {
+                        text += words[Math.floor(Math.random() * words.length)] + ' ';
+                    } else {
+                        for (let j = 0; j < Math.floor(Math.random() * 8) + 3; j++) {
+                            text += gibberish[Math.floor(Math.random() * gibberish.length)];
+                        }
+                        text += ' ';
+                    }
+                }
+                textarea.value += text;
+                textarea.scrollTop = textarea.scrollHeight;
+            }, 1000);
+        }
+
+        function openFiles() {
+            const win = createWindow("Files");
+            win.style.width = '500px';
+            win.style.height = '400px';
+            const content = document.createElement("div");
+            content.style.padding = '20px';
+            content.style.color = '#0f0';
+            content.style.fontFamily = 'Courier New';
+            content.style.fontSize = '14px';
+            content.innerHTML = '<p>📁 [CORRUPTED]</p><p>📁 [ACCESS_DENIED]</p><p>📁 [FILE_NOT_FOUND]</p><p>📁 [ERROR_0x8007]</p><p>📁 [SYSTEM_FAILURE]</p><p>📁 [VOID]</p>';
+            content.style.animation = 'fileGlitch 2s infinite';
+            const style = document.createElement('style');
+            style.textContent = '@keyframes fileGlitch { 0%, 90% { filter: none; } 92% { filter: hue-rotate(180deg); } 94% { filter: invert(1); } 96% { filter: none; } }';
+            document.head.appendChild(style);
+            win.appendChild(content);
+        }
     </script>
-    <script src="effects/particles.js"></script>
-    <script src="effects/drift.js"></script>
-    <script src="effects/glitches.js"></script>
-    <script src="main.js"></script>
 </body>
 </html>
